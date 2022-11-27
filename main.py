@@ -9,13 +9,13 @@ from ev3dev.auto import *
 
 # ------Input--------
 power = 30
-target = 16
-kp = float(0.80) # Proportional gain, Start value 1
-kd = 0.30        # Derivative gain, Start value 0
-ki = float(0.10) # Integral gain, Start value 0
+target = 40
+kp = float(1) # Proportional gain, Start value 1
+kd = 0.20       # Derivative gain, Start value 0
+ki = float(0.07) # Integral gain, Start value 0
 direction = 1
-minRef = 7 # Sensor min value 
-maxRef = 25 # Sensor max value 
+minRef = 11 # Sensor min value 
+maxRef = 80 # Sensor max value 
 # -------------------
 
 #Motors
@@ -59,12 +59,12 @@ def readingSensors():
 def steering(course, power,correction):
 	power_left = power_right = power + correction
 	s = (50 - abs(float(course))) / 50
-
+	#print(course)
 	if course >= 0:
 		power_right *= s
 		if course > 100:
 			power_right = - power
-	else:
+	else :
 		power_left *= s
 		if course < -100:
 			power_left = - power
