@@ -3,36 +3,34 @@
 
 import threading
 from time import sleep
-from smbus import SMBus
-from ev3dev2.port import LegoPort
+
 from ev3dev.auto import *
 
 # ------Input--------
 power = 30
-target = 40
+target = 43
 kp = float(1) # Proportional gain, Start value 1
-kd = 0.20       # Derivative gain, Start value 0
+kd = 0.46          # Derivative gain, Start value 0
 ki = float(0.07) # Integral gain, Start value 0
 direction = 1
 minRef = 11 # Sensor min value 
-maxRef = 80 # Sensor max value 
+maxRef = 89 # Sensor max value 
 # -------------------
 
-#Motors
-left_motor = LargeMotor(OUTPUT_D);  assert left_motor.connected
-right_motor = LargeMotor(OUTPUT_A); assert right_motor.connected
+#MUX Init
+muxC1port = LegoPort("in1:i2c80:mux1")
+muxC1port.set_device="lego-ev3-us"
+sleep(1) # need to wait for sensors to be loaded. 0.5 seconds is not enough.
+
+ul = UltrasonicSensor("in1:i2c80:mux1"); assert ul.connected
 
 # Sensors
-#ts = TouchSensor();   	assert ts.connected
 col= ColorSensor(INPUT_3);		assert col.connected
-col_left = ColorSensor(INPUT_2); assert col_left.connected
-col_right = ColorSensor(INPUT_4); assert col_right.connected
-ul = UltrasonicSensor(INPUT_1); #assert ul.connected
+col_left = ColorSensor(INPUT_2)
+col_right = ColorSensor(INPUT_4)
 
 # Change color sensor mode
 col.mode = 'COL-REFLECT'
-col_left.mode = 'COL-REFLECT'
-col_right.mode = 'COL-REFLECT'
 
 btn = Button()
 
@@ -42,6 +40,11 @@ turnRight = False
 turnLeft = False
 
 print("Hi ... \n")
+#Motors
+left_motor = LargeMotor(OUTPUT_D);  assert left_motor.connected
+right_motor = LargeMotor(OUTPUT_A); assert right_motor.connected
+
+
 
 #Function for ultrasonic sensor
 def readingSensors():
@@ -59,12 +62,12 @@ def readingSensors():
 def steering(course, power,correction):
 	power_left = power_right = power + correction
 	s = (50 - abs(float(course))) / 50
-	#print(course)
+
 	if course >= 0:
 		power_right *= s
 		if course > 100:
 			power_right = - power
-	else :
+	else:
 		power_left *= s
 		if course < -100:
 			power_left = - power
@@ -78,31 +81,40 @@ def run(power, target, kp, kd, ki, direction, minRef, maxRef):
 	right_motor.run_direct()
 
 	#thread = threading(readingSensors)
-	
+
 
 	while not btn.any() :
 		if btn.down: # User pressed the touch sensor
 			print('Breaking loop')
 			break
-		
+		val_left = col_left.value()
+		val_right = col_right.value()
+		print('LEFT : ' + str(val_left) + 'RIGHT : '+str(val_right))
+		if (val_left < 10) & (val_right < 10):
+			left_motor.duty_cycle_sp = 60
+			right_motor.duty_cycle_sp = 0
+			print("CROSSROAD!")
+			sleep(1)
+
 		#thread.start()
 		#PID computing
 		ulCorrection = readingSensors()
 		refRead = col.value()
 		#print(refRead)
 		#print("\n")
-		
+
 		error = target - (100 * ( refRead - minRef ) / ( maxRef - minRef ))
 		derivative = error - lastError
 		lastError = error
 		integral = float(0.5) * integral + error
 		course = (kp * error + kd * derivative +ki * integral) * direction
-		
+
+
 		for (motor, pow) in zip((left_motor, right_motor), steering(course, power,ulCorrection)):
 			motor.duty_cycle_sp = pow
 
 		sleep(0.01) # Aprox 100 Hz
-		print(col.value())
+
 
 run(power, target, kp, kd, ki, direction, minRef, maxRef)
 

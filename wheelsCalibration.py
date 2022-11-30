@@ -17,14 +17,18 @@ minRef = 11 # Sensor min value
 maxRef = 89 # Sensor max value 
 # -------------------
 
+#MUX Init
+muxC1port = LegoPort("in1:i2c80:mux1")
+muxC1port.set_device="lego-ev3-us"
+sleep(1) # need to wait for sensors to be loaded. 0.5 seconds is not enough.
+
+
 #Motors
-left_motor = LargeMotor(OUTPUT_B);  assert left_motor.connected
+left_motor = LargeMotor(OUTPUT_D);  assert left_motor.connected
 right_motor = LargeMotor(OUTPUT_A); assert right_motor.connected
 
 # Sensors
-ts = TouchSensor();   	assert ts.connected
-col= ColorSensor();		assert col.connected
-ul = UltrasonicSensor(); assert ul.connected
+ul = UltrasonicSensor("in1:i2c80:mux1"); assert ul.connected
 
 
 def main() :
@@ -36,6 +40,8 @@ def main() :
     right_motor.duty_cycle_sp = power
     sleep(20)
     
+    print(ul.value())
+
     left_motor.stop()
     right_motor.stop()
 
