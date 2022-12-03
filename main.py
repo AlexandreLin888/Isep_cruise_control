@@ -9,13 +9,19 @@ from ev3dev.auto import *
 # ------Input--------
 power = 30
 target = 43
-kp = float(1) # Proportional gain, Start value 1
-kd = 0.46          # Derivative gain, Start value 0
+kp = float(0.8) # Proportional gain, Start value 1
+kd = float(0.46)          # Derivative gain, Start value 0
 ki = float(0.07) # Integral gain, Start value 0
 direction = 1
 minRef = 11 # Sensor min value 
 maxRef = 89 # Sensor max value 
 # -------------------
+
+#SOUND init
+speaker = Sound()
+speaker.speak("Hellow")
+
+HOLE = False
 
 #MUX Init
 muxC1port = LegoPort("in1:i2c80:mux1")
@@ -39,7 +45,6 @@ ulCorrection = 0
 turnRight = False
 turnLeft = False
 
-print("Hi ... \n")
 #Motors
 left_motor = LargeMotor(OUTPUT_D);  assert left_motor.connected
 right_motor = LargeMotor(OUTPUT_A); assert right_motor.connected
@@ -87,33 +92,55 @@ def run(power, target, kp, kd, ki, direction, minRef, maxRef):
 		if btn.down: # User pressed the touch sensor
 			print('Breaking loop')
 			break
+
+		
+		ulCorrection = readingSensors()
+		#Reading sensors for crossroad & interruption detection
+		refRead = col.value()
 		val_left = col_left.value()
 		val_right = col_right.value()
-		print('LEFT : ' + str(val_left) + 'RIGHT : '+str(val_right))
-		if (val_left < 10) & (val_right < 10):
-			left_motor.duty_cycle_sp = 60
-			right_motor.duty_cycle_sp = 0
-			print("CROSSROAD!")
-			sleep(1)
 
-		#thread.start()
+			
+
+		print('LEFT : ' + str(val_left) + ' RIGHT : '+str(val_right))
+		if (val_left < 20) & (val_right < 20):
+			if kp == float(1.2) :
+				kp = float(0.8)
+			elif kp == float(0.8) :
+				kp = float(1.2)
+			turnLeft(kp)
+
 		#PID computing
-		ulCorrection = readingSensors()
-		refRead = col.value()
-		#print(refRead)
-		#print("\n")
-
-		error = target - (100 * ( refRead - minRef ) / ( maxRef - minRef ))
-		derivative = error - lastError
-		lastError = error
-		integral = float(0.5) * integral + error
-		course = (kp * error + kd * derivative +ki * integral) * direction
-
-
-		for (motor, pow) in zip((left_motor, right_motor), steering(course, power,ulCorrection)):
-			motor.duty_cycle_sp = pow
+		if (val_left > 55) & (val_right > 55) & (refRead > 55):
+			straightForward(pow)
+		else:
+			error = target - (100 * ( refRead - minRef ) / ( maxRef - minRef ))
+			derivative = error - lastError
+			lastError = error
+			integral = float(0.5) * integral + error
+			course = (kp * error + kd * derivative +ki * integral) * direction
+			
+			for (motor, pow) in zip((left_motor, right_motor), steering(course, power,ulCorrection)):
+				motor.duty_cycle_sp = pow
 
 		sleep(0.01) # Aprox 100 Hz
+
+def turnLeft(kp):
+	speaker.speak("CROSSROAD " + str(kp))
+	left_motor.duty_cycle_sp = 60
+	right_motor.duty_cycle_sp = 0
+	sleep(1)
+
+def turnRight():
+	speaker.speak("CROSSROAD!")
+	left_motor.duty_cycle_sp = 0
+	right_motor.duty_cycle_sp = 60
+	sleep(1)
+
+def straightForward(pow):
+	left_motor.duty_cycle_sp = pow
+	right_motor.duty_cycle_sp = pow
+	sleep(1)
 
 
 run(power, target, kp, kd, ki, direction, minRef, maxRef)

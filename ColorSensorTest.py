@@ -1,22 +1,28 @@
-#!/usr/bin/ python3
+from time import sleep
 
-from time   import sleep
-from random import choice, randint
+from ev3dev.auto import *
+#BUTTON Init
+btn = Button()
 
-from ev3dev2.motor import LargeMotor,OUTPUT_B, OUTPUT_A
-from ev3dev2.sensor import INPUT_1,INPUT_2,INPUT_3
-from ev3dev2.sensor.lego import TouchSensor, ColorSensor, UltrasonicSensor
-from ev3dev2.button import Button
-from ev3dev2.led import Leds
-from ev3dev2.sound import Sound
-import time
+#SENSORS Init
+col_left = ColorSensor(INPUT_2)
+col_center = ColorSensor(INPUT_3)
+col_right = ColorSensor(INPUT_4)
 
-cs = ColorSensor(INPUT_2)
-us = UltrasonicSensor(INPUT_3)
+#SOUND Init
+speaker = Sound()
 
-print("Started")
+while not btn.any() :
+    if btn.down: # User pressed the touch sensor
+        print('Breaking loop')
+        break
+    
+    #Reading sensors for crossroad detection
+    val_left = col_left.value()
+    val_right = col_right.value()
+    val_center = col_center.value()
 
-while True:
-    #print(cs.reflected_light_intensity)
-    print(us.distance_centimeters_continuous)
+    print('LEFT : ' + str(val_left)+'CENTER'+str(val_center) + ' RIGHT : '+str(val_right))
+    if (val_left > 55) & (val_right > 55) & (val_center > 55):
+        speaker.speak("Interruption")
     sleep(1)
