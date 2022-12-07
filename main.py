@@ -9,10 +9,10 @@ from ev3dev.auto import *
 # ------Input--------
 power = 30
 target = 43
-kp = float(0.8) # Proportional gain, Start value 1
+kp = float(0.85) # Proportional gain, Start value 1
 kd = float(0.46)          # Derivative gain, Start value 0
-ki = float(0.07) # Integral gain, Start value 0
-direction = 1
+ki = float(0.15) # Integral gain, Start value 0
+direction = 1 # Direction (-1 for black line on the left or 1 for black line on the right)
 minRef = 11 # Sensor min value 
 maxRef = 89 # Sensor max value 
 # -------------------
@@ -20,8 +20,6 @@ maxRef = 89 # Sensor max value
 #SOUND init
 speaker = Sound()
 speaker.speak("Hellow")
-
-HOLE = False
 
 #MUX Init
 muxC1port = LegoPort("in1:i2c80:mux1")
@@ -102,18 +100,20 @@ def run(power, target, kp, kd, ki, direction, minRef, maxRef):
 
 			
 
-		print('LEFT : ' + str(val_left) + ' RIGHT : '+str(val_right))
 		if (val_left < 20) & (val_right < 20):
+			print('LEFT : ' + str(val_left) + ' RIGHT : '+str(val_right))
 			if kp == float(1.2) :
 				kp = float(0.8)
 			elif kp == float(0.8) :
 				kp = float(1.2)
+			integral = 0
 			turnLeft(kp)
-
-		#PID computing
-		if (val_left > 55) & (val_right > 55) & (refRead > 55):
+		if (val_left > 70) & (val_right > 70) & (refRead > 70):
+			print('Interuption')
 			straightForward(pow)
 		else:
+			#PID computing
+			print("PID Control")
 			error = target - (100 * ( refRead - minRef ) / ( maxRef - minRef ))
 			derivative = error - lastError
 			lastError = error
@@ -127,7 +127,7 @@ def run(power, target, kp, kd, ki, direction, minRef, maxRef):
 
 def turnLeft(kp):
 	speaker.speak("CROSSROAD " + str(kp))
-	left_motor.duty_cycle_sp = 60
+	left_motor.duty_cycle_sp = 55
 	right_motor.duty_cycle_sp = 0
 	sleep(1)
 
@@ -140,7 +140,7 @@ def turnRight():
 def straightForward(pow):
 	left_motor.duty_cycle_sp = pow
 	right_motor.duty_cycle_sp = pow
-	sleep(1)
+	sleep(0.5)
 
 
 run(power, target, kp, kd, ki, direction, minRef, maxRef)

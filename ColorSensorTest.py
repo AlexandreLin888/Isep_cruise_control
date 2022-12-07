@@ -22,7 +22,7 @@ while not btn.any() :
     val_right = col_right.value()
     val_center = col_center.value()
 
-    print('LEFT : ' + str(val_left)+'CENTER'+str(val_center) + ' RIGHT : '+str(val_right))
+    print('LEFT : ' + str(val_left)+' CENTER'+str(val_center) + ' RIGHT : '+str(val_right))
     if (val_left > 55) & (val_right > 55) & (val_center > 55):
         speaker.speak("Interruption")
     sleep(1)
