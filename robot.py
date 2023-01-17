@@ -6,121 +6,160 @@ from time import sleep
 from smbus import SMBus
 from ev3dev2.port import LegoPort
 from ev3dev.auto import *
+from pixy2 import (
+    Pixy2,
+    MainFeatures,
+    STOP,
+    SLOW_DOWN,
+	FORBIDDEN,
+	GOTTA_GO_FAST
+    )
+#----------Sensors init----------
+#CAMERA Init
+pixy2 = Pixy2()
+data = MainFeatures()
 
-class LineFollower:
+#Motors
+left_motor = LargeMotor(OUTPUT_D);  assert left_motor.connected
+right_motor = LargeMotor(OUTPUT_A); assert right_motor.connected
 
-    #Initialisation of the differents sensors and actuator
-    def init(self):
-        # ------Input--------
-        self.power = 30
-        self.target = 43
-        self.kp = float(0.80) # Proportional gain, Start value 1
-        self.kd = 0.46          # Derivative gain, Start value 0
-        self.ki = float(0.07) # Integral gain, Start value 0
-        self.direction = -1
-        self.minRef = 11 # Sensor min value 
-        self.maxRef = 89 # Sensor max value 
-        # -------------------
-        
-        #Motors
-        self.left_motor = LargeMotor(OUTPUT_D);  assert self.left_motor.connected
-        self.right_motor = LargeMotor(OUTPUT_A); assert self.right_motor.connected
+#MUX Init
+muxC1port = LegoPort("in1:i2c80:mux1")
+muxC2port = LegoPort("in1:i2c81:mux2")
+muxC3port = LegoPort("in1:i2c82:mux3")
 
-        # Sensors
-        #MUX Init
-        muxC1port = LegoPort("in1:i2c80:mux1")
-        muxC1port.set_device="lego-ev3-us"
-        sleep(1) # need to wait for sensors to be loaded. 0.5 seconds is not enough.
+muxC1port.set_device="lego-ev3-color"
+muxC2port.set_device="lego-ev3-color"
+muxC3port.set_device="lego-ev3-color"
+sleep(1) # need to wait for sensors to be loaded. 0.5 seconds is not enough.
 
-        ul = UltrasonicSensor("in1:i2c80:mux1"); assert ul.connected
-        self.col= ColorSensor(INPUT_3);		assert self.col.connected
-        self.col_left = ColorSensor(INPUT_2); assert self.col_left.connected
-        self.col_right = ColorSensor(INPUT_4); assert self.col_right.connected
-        self.ul = UltrasonicSensor(INPUT_1); assert ul.connected
+# Sensors
+col_right = ColorSensor("in1:i2c80:mux1")
+col= ColorSensor("in1:i2c81:mux2");		assert col.connected
+col_left = ColorSensor("in1:i2c82:mux3")
+ul = UltrasonicSensor(INPUT_3); assert ul.connected
 
-        # Change color sensor mode
-        self.col.mode = 'COL-REFLECT'
-        self.col_left.mode = 'COL-REFLECT'
-        self.col_right.mode = 'COL-REFLECT'
+# Change color sensor mode
+col_right.mode = 'COL-REFLECT'
+col.mode = 'COL-REFLECT'
+col_left.mode = 'COL-REFLECT'
 
-        #Global values
-        self.ulCorrection = 0
-        self.turnRight = False
-        self.turnLeft = False
+btn = Button()
 
-        print("Hi ... \n")       
+#----------Settings----------
+power = 30
+movementPower = 55
+target = 35
+kp = float(0.75) # Proportional gain, Start value 1
+ki = float(0.04) # Integral gain, Start value 0
+kd = 0.70        # Derivative gain, Start value 0
+direction = -1
+minRef = 5 # Sensor min value 
+maxRef = 60# Sensor max value
+state = 0# switch index 
+#-----------------------
 
-
-     #Function for ultrasonic sensor
-    def readingSensors(self):
-        distance = self.ul.value()/10
-        if distance < 20 and distance > 10 :
-            correction = -100 / distance
-        elif distance <= 10 :
-            correction = - self.power
-        else :
-            correction = 0
-        
-        correction = 0
-
-        return correction
-
-     #Function called to compute power for each motors
-    def steering(self,course, power,correction):
-        power_left = power_right = power + correction
-        s = (50 - abs(float(course))) / 50
-        if course >= 0:
-            power_right *= s
-        if course > 100:
-            power_right = - power
-        else:
-            power_left *= s
-        if course < -100:
-            power_left = - power
-        
-        return (int(power_left), int(power_right))
-
-    def run(self,power, target, kp, kd, ki, direction, minRef, maxRef,lastError,error,integral):
-
-	    #PID computing
-        self.ulCorrection = self.readingSensors()
-        self.refRead = self.col.value()
-        self.error = target - (100 * ( self.refRead - minRef ) / ( maxRef - minRef ))
-        self.derivative = self.error - self.lastError
-        self.lastError = self.error
-        self.integral = float(0.5) * self.integral + self.error
-        self.course = (kp * self.error + self.kd * self.derivative +self.ki * self.integral) * self.direction
-        print(self.course)
-
-        for (motor, pow) in zip((self.left_motor, self.right_motor), self.steering(self.course, self.power,self.ulCorrection)):
-            motor.duty_cycle_sp = pow
-            sleep(0.01) # Aprox 100 Hz
-
-    #Simple line following
-    def goStraight(self):
-        self.run( self.power,self.target, self.kp, self.kd, self.ki, self.direction, self.minRef, self.maxRef,0,0,0)
-
-    #Turn to the right
-    def turnRight(self):
-        self.run(self.power, self.target, self.kp, self.kd, self.ki, self.direction, self.minRef, self.maxRef,0,0,0)
+#Thread function for camera panel (barcodes) reading
+class CameraThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.currentPanel = None
+        self.panelSaw = False
+        self.stateIndex = 0
     
-        return 0
+    def run(self):
+        while True:
+            data = pixy2.getdata()
+            if data.error:
+                self.currentPanel = ""
+            else:
+                self.panelSaw = True
+                self.currentPanel = ""
+                if data.number_of_barcodes > 0:
+                    pixy2.lamp_on()
+                    for i in range(0, data.number_of_barcodes):
+                        if data.barcodes[i].code == STOP:
+                            self.currentPanel = "STOP SIGN"
+                            self.stateIndex = 1
+                        elif data.barcodes[i].code == SLOW_DOWN:
+                            self.currentPanel = "SLOW_DOWN"
+                            self.stateIndex = 6
+                        elif data.barcodes[i].code == FORBIDDEN:
+                            self.currentPanel = "FORBIDDEN"
+                            state
+                        elif data.barcodes[i].code == GOTTA_GO_FAST:
+                             self.currentPanel = "GOTTA GO FAST"
+                else:
+                    self.currentPanel = 0
+                    self.stateIndex = 0        
+            sleep(1)
+            data.clear()
+            self.currentPanel = None
+            pixy2.lamp_off()
 
-    #Turn to the right
-    def turnLeft(self):
-        return 0
-
-    #Start the engine
-    def Start(self):
-        self.lastError = 0
-        self.error = 0
-        self.integral = 0
-        self.left_motor.run_direct()
-        self.right_motor.run_direct()
+#Thread for ultrasonic sensor reading
+class UltrasonicSensorThread(threading.Thread):
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        self.Correction = 0
     
-    #Stop the robot
-    def Stop(self):   
-        # Stop the motors before exiting.
-        print ('Stopping motors')
-        self.left_motor.stop()
-        self.right_motor.stop()
+    def run(self):
+        while True:
+            distance = ul.value()/10
+            if distance < 20 and distance > 10 :
+                self.Correction = -100 / distance
+            elif distance <= 10 :
+                self.Correction = - power
+            else :
+                self.Correction = 0
+
+#Function called to compute power for each motors
+def steering(course, power,correction):
+	power_left = power_right = power + correction
+	s = (50 - abs(float(course))) / 50
+
+	if course >= 0:
+		power_right *= s
+		if course > 100:
+			power_right = - power
+	else:
+		power_left *= s
+		if course < -100:
+			power_left = - power
+
+	return (int(power_left), int(power_right))
+
+
+#----------Robot movements functions----------
+def turnLeft(self):
+	left_motor.duty_cycle_sp = movementPower
+	right_motor.duty_cycle_sp = 0
+	sleep(1)
+
+def turnRight(self):
+	left_motor.duty_cycle_sp = 0
+	right_motor.duty_cycle_sp = movementPower
+	sleep(1)
+
+def goForward(self, power):
+    left_motor.duty_cycle_sp = power
+    right_motor.duty_cycle_sp = power
+    sleep(1)
+
+def goBack(self):
+	left_motor.duty_cycle_sp = movementPower
+	right_motor.duty_cycle_sp = -movementPower
+	sleep(1)
+
+def stop(self):
+    left_motor.duty_cycle_sp = 0
+    right_motor.duty_cycle_sp = 0
+    sleep(3)
+
+def increasePower(self):
+    power = 35
+
+def decreasePower(self):
+    power = 25

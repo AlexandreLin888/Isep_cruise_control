@@ -4,146 +4,98 @@
 import threading
 from time import sleep
 
+from robot import *
 from ev3dev.auto import *
+from pixy2 import (
+    Pixy2,
+    MainFeatures,
+    STOP,
+    SLOW_DOWN,
+	FORBIDDEN,
+	GOTTA_GO_FAST
+    )
 
-# ------Input--------
-power = 30
-target = 43
-kp = float(0.85) # Proportional gain, Start value 1
-kd = float(0.46)          # Derivative gain, Start value 0
-ki = float(0.15) # Integral gain, Start value 0
-direction = 1 # Direction (-1 for black line on the left or 1 for black line on the right)
-minRef = 11 # Sensor min value 
-maxRef = 89 # Sensor max value 
-# -------------------
-
-#SOUND init
+#Speaker
 speaker = Sound()
 speaker.speak("Hellow")
 
-#MUX Init
-muxC1port = LegoPort("in1:i2c80:mux1")
-muxC1port.set_device="lego-ev3-us"
-sleep(1) # need to wait for sensors to be loaded. 0.5 seconds is not enough.
-
-ul = UltrasonicSensor("in1:i2c80:mux1"); assert ul.connected
-
-# Sensors
-col= ColorSensor(INPUT_3);		assert col.connected
-col_left = ColorSensor(INPUT_2)
-col_right = ColorSensor(INPUT_4)
-
-# Change color sensor mode
-col.mode = 'COL-REFLECT'
-
-btn = Button()
-
-#Global values
-ulCorrection = 0
-turnRight = False
-turnLeft = False
-
-#Motors
-left_motor = LargeMotor(OUTPUT_D);  assert left_motor.connected
-right_motor = LargeMotor(OUTPUT_A); assert right_motor.connected
+#Threads
+ul_sensor = UltrasonicSensorThread()
+camera_Reading = CameraThread();
 
 
+print("Hi ... \n")
 
-#Function for ultrasonic sensor
-def readingSensors():
-	distance = ul.value()/10
-	#Computing a correction depending on the measured distance
-	if distance < 20 and distance > 10 :
-		correction = -100 / distance
-	elif distance <= 10 :
-		correction = - power
-	else :
-		correction = 0
-	return correction
-
-#Function called to compute power for each motors
-def steering(course, power,correction):
-	power_left = power_right = power + correction
-	s = (50 - abs(float(course))) / 50
-
-	if course >= 0:
-		power_right *= s
-		if course > 100:
-			power_right = - power
-	else:
-		power_left *= s
-		if course < -100:
-			power_left = - power
-
-	return (int(power_left), int(power_right))
 
 #Main function
-def run(power, target, kp, kd, ki, direction, minRef, maxRef):
+def main(power, target, kp, kd, ki, direction, minRef, maxRef):
 	lastError = error = integral = 0
 	left_motor.run_direct()
-	right_motor.run_direct()
-
-	#thread = threading(readingSensors)
-
+	right_motor.run_direct()	
 
 	while not btn.any() :
 		if btn.down: # User pressed the touch sensor
 			print('Breaking loop')
 			break
 
-		
-		ulCorrection = readingSensors()
-		#Reading sensors for crossroad & interruption detection
-		refRead = col.value()
 		val_left = col_left.value()
 		val_right = col_right.value()
 
-			
-
+		#In case of crossroad
 		if (val_left < 20) & (val_right < 20):
-			print('LEFT : ' + str(val_left) + ' RIGHT : '+str(val_right))
-			if kp == float(1.2) :
-				kp = float(0.8)
-			elif kp == float(0.8) :
-				kp = float(1.2)
-			integral = 0
-			turnLeft(kp)
+			turnLeft()
+		#In case of interruption
 		if (val_left > 70) & (val_right > 70) & (refRead > 70):
-			print('Interuption')
-			straightForward(pow)
-		else:
-			#PID computing
-			print("PID Control")
+			print('Interruption')
+			goForward(pow)
+
+		state = camera_Reading.stateIndex
+
+		if (state == 0):
+			#Case 0 : PID computing
+			refRead = col.value()
+
 			error = target - (100 * ( refRead - minRef ) / ( maxRef - minRef ))
 			derivative = error - lastError
 			lastError = error
 			integral = float(0.5) * integral + error
 			course = (kp * error + kd * derivative +ki * integral) * direction
-			
-			for (motor, pow) in zip((left_motor, right_motor), steering(course, power,ulCorrection)):
+
+			for (motor, pow) in zip((left_motor, right_motor), steering(course, power,ul_sensor.Correction)):
 				motor.duty_cycle_sp = pow
+			sleep(0.01) # Aprox 100 Hz
+		elif (state==1):
+			#Case 1 : Stop sign
+			stop()
+			state = 0
+		elif (state==2):
+			#Case 2 : FORBBIDEN SIGN OR CROSSROAD
+			turnLeft()
+			state = 0
+		elif (state==3):
+			#Case 3 : FORBBIDEN SIGN OR CROSSROAD
+			turnLeft()
+			state = 0
+		elif (state==4):
+			#Case 4 : FORBBIDEN SIGN OR CROSSROAD
+			turnRight()
+			state = 0
+		elif (state == 5):
+			#Case 5 : GOTTA GO FAST SIGN
+			increasePower()
+			state = 0
+		elif (state == 6):
+			#Case 6 : SLOW DOWN SIGN 
+			decreasePower()
+			state = 0
+			
 
-		sleep(0.01) # Aprox 100 Hz
+#Thread starts
+ul_sensor.start()
+camera_Reading.start()
 
-def turnLeft(kp):
-	speaker.speak("CROSSROAD " + str(kp))
-	left_motor.duty_cycle_sp = 55
-	right_motor.duty_cycle_sp = 0
-	sleep(1)
-
-def turnRight():
-	speaker.speak("CROSSROAD!")
-	left_motor.duty_cycle_sp = 0
-	right_motor.duty_cycle_sp = 60
-	sleep(1)
-
-def straightForward(pow):
-	left_motor.duty_cycle_sp = pow
-	right_motor.duty_cycle_sp = pow
-	sleep(0.5)
-
-
-run(power, target, kp, kd, ki, direction, minRef, maxRef)
+#Main function start
+main(power, target, kp, kd, ki, direction, minRef, maxRef)
 
 # Stop the motors before exiting.
 print ('Stopping motors')

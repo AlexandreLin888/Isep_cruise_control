@@ -3,21 +3,26 @@
 from time   import sleep
 from random import choice, randint
 
-from ev3dev2.motor import LargeMotor,OUTPUT_B, OUTPUT_A
-from ev3dev2.sensor import INPUT_1,INPUT_2,INPUT_3,INPUT_4
-from ev3dev2.sensor.lego import TouchSensor, ColorSensor
-from ev3dev2.button import Button
-from ev3dev2.led import Leds
-from ev3dev2.sound import Sound
+from ev3dev.auto import *
+
 import time
 
-cs = ColorSensor(INPUT_3)
+muxC2port = LegoPort("in1:i2c81:mux2")
+muxC2port.set_device="lego-ev3-color"
+sleep(1) # need to wait for sensors to be loaded. 0.5 seconds is not enough.
+
+cs= ColorSensor("in1:i2c81:mux2");		assert cs.connected
+
+cs.mode = 'COL-REFLECT'
+
 
 print("Started")
 
-meanValue = cs.reflected_light_intensity
+meanValue = cs.value()
 
 while True:
-    meanValue = (meanValue+cs.reflected_light_intensity)/2
+    meanValue = (meanValue+cs.value())/2
     print(meanValue)
     print('\n')
+    print(cs.value())
+    sleep(1)
