@@ -2,7 +2,8 @@ Cruise project
 ===================================
 ![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
 
-This is a LEGO ev3 student project, our goal is to create a robot to follow a line and change it's behaviour depending on the distance of any vehicle in front of it and on panel it will pas by. 
+This is a LEGO ev3 student project, our goal is to create a robot to follow a line and change it's behaviour depending on the distance of any vehicle in front of it.
+The robot should also be able to detect panel and react depending on the panel seen
 
 Requirement
 ---------------
@@ -13,6 +14,4 @@ Requirement
 Todo :
 ---------------
 * Tune the pid
-* Deviation to the right ?
-* Implement the class
-* Code the cross case and the interruption case
+* adapt power depending on battery
