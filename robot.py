@@ -49,13 +49,13 @@ btn = Button()
 #----------Settings----------
 power = 30
 movementPower = 55
-target = 35
-kp = float(0.70) # Proportional gain, Start value 1
-ki = float(0.01) # Integral gain, Start value 0
-kd = 0.39    # Derivative gain, Start value 0
+target = 47
+kp = float(0.80) # Proportional gain, Start value 1
+ki = float(0.07) # Integral gain, Start value 0
+kd = 0.46    # Derivative gain, Start value 0
 direction = -1
 minRef = 5 # Sensor min value 
-maxRef = 60# Sensor max value
+maxRef = 70# Sensor max value
 state = 0# switch index 
 #-----------------------
 
@@ -67,9 +67,6 @@ class CameraThread(threading.Thread):
         self.currentPanel = None
         self.panelSaw = False
         self.stateIndex = 0
-
-    def sleep(self,duration):
-        self.sleep(duration)
     
     def run(self):
         while True:
