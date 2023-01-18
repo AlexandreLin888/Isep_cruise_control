@@ -50,9 +50,9 @@ btn = Button()
 power = 30
 movementPower = 55
 target = 35
-kp = float(0.75) # Proportional gain, Start value 1
-ki = float(0.04) # Integral gain, Start value 0
-kd = 0.70        # Derivative gain, Start value 0
+kp = float(0.70) # Proportional gain, Start value 1
+ki = float(0.01) # Integral gain, Start value 0
+kd = 0.39    # Derivative gain, Start value 0
 direction = -1
 minRef = 5 # Sensor min value 
 maxRef = 60# Sensor max value
@@ -67,6 +67,9 @@ class CameraThread(threading.Thread):
         self.currentPanel = None
         self.panelSaw = False
         self.stateIndex = 0
+
+    def sleep(self,duration):
+        self.sleep(duration)
     
     def run(self):
         while True:
@@ -87,16 +90,21 @@ class CameraThread(threading.Thread):
                             self.stateIndex = 6
                         elif data.barcodes[i].code == FORBIDDEN:
                             self.currentPanel = "FORBIDDEN"
-                            state
+                            self.stateIndex = 2
                         elif data.barcodes[i].code == GOTTA_GO_FAST:
                              self.currentPanel = "GOTTA GO FAST"
+                             self.stateIndex = 5
+                        else :
+                            self.stateIndex = 0
+                    sleep(1)
+                    pixy2.lamp_off()
+
                 else:
                     self.currentPanel = 0
                     self.stateIndex = 0        
-            sleep(1)
-            data.clear()
-            self.currentPanel = None
-            pixy2.lamp_off()
+                data.clear()
+                self.currentPanel = None
+
 
 #Thread for ultrasonic sensor reading
 class UltrasonicSensorThread(threading.Thread):
@@ -133,33 +141,40 @@ def steering(course, power,correction):
 
 
 #----------Robot movements functions----------
-def turnLeft(self):
-	left_motor.duty_cycle_sp = movementPower
-	right_motor.duty_cycle_sp = 0
-	sleep(1)
-
-def turnRight(self):
-	left_motor.duty_cycle_sp = 0
-	right_motor.duty_cycle_sp = movementPower
-	sleep(1)
-
-def goForward(self, power):
-    left_motor.duty_cycle_sp = power
-    right_motor.duty_cycle_sp = power
+def turnLeft():
+    left_motor.duty_cycle_sp = movementPower
+    right_motor.duty_cycle_sp = 0
+    print("turnLeft Called")
     sleep(1)
 
-def goBack(self):
-	left_motor.duty_cycle_sp = movementPower
-	right_motor.duty_cycle_sp = -movementPower
-	sleep(1)
+def turnRight():
+    left_motor.duty_cycle_sp = 0
+    right_motor.duty_cycle_sp = movementPower
+    print("turnRight Called")
+    sleep(1)
 
-def stop(self):
+def goForward(power):
+    left_motor.duty_cycle_sp = power
+    right_motor.duty_cycle_sp = power
+    print("goForward Called")
+    sleep(1)
+
+def goBack():
+    left_motor.duty_cycle_sp = movementPower
+    right_motor.duty_cycle_sp = -movementPower
+    print("goBack Called")
+    sleep(1)
+
+def stop():
     left_motor.duty_cycle_sp = 0
     right_motor.duty_cycle_sp = 0
+    print("stop Called")
     sleep(3)
 
-def increasePower(self):
-    power = 35
+def increasePower():
+    print("increasepower called")
+    return 35
 
-def decreasePower(self):
-    power = 25
+def decreasePower():
+    print("decreasePower called")
+    return 15

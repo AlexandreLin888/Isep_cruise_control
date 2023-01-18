@@ -37,7 +37,7 @@ def main(power, target, kp, kd, ki, direction, minRef, maxRef):
 		if btn.down: # User pressed the touch sensor
 			print('Breaking loop')
 			break
-
+		refRead = col.value()
 		val_left = col_left.value()
 		val_right = col_right.value()
 
@@ -53,13 +53,11 @@ def main(power, target, kp, kd, ki, direction, minRef, maxRef):
 
 		if (state == 0):
 			#Case 0 : PID computing
-			refRead = col.value()
-
 			error = target - (100 * ( refRead - minRef ) / ( maxRef - minRef ))
 			derivative = error - lastError
 			lastError = error
 			integral = float(0.5) * integral + error
-			course = (kp * error + kd * derivative +ki * integral) * direction
+			course = (kp * error + kd * derivative + ki * integral) * direction
 
 			for (motor, pow) in zip((left_motor, right_motor), steering(course, power,ul_sensor.Correction)):
 				motor.duty_cycle_sp = pow
@@ -67,26 +65,32 @@ def main(power, target, kp, kd, ki, direction, minRef, maxRef):
 		elif (state==1):
 			#Case 1 : Stop sign
 			stop()
+			camera_Reading.sleep(10)
 			state = 0
 		elif (state==2):
 			#Case 2 : FORBBIDEN SIGN OR CROSSROAD
 			turnLeft()
+			camera_Reading.sleep(10)
 			state = 0
 		elif (state==3):
 			#Case 3 : FORBBIDEN SIGN OR CROSSROAD
 			turnLeft()
+			camera_Reading.sleep(10)
 			state = 0
 		elif (state==4):
 			#Case 4 : FORBBIDEN SIGN OR CROSSROAD
 			turnRight()
+			camera_Reading.sleep(10)
 			state = 0
 		elif (state == 5):
 			#Case 5 : GOTTA GO FAST SIGN
-			increasePower()
+			power = increasePower()
+			camera_Reading.sleep(10)
 			state = 0
 		elif (state == 6):
 			#Case 6 : SLOW DOWN SIGN 
-			decreasePower()
+			power = decreasePower()
+			camera_Reading.sleep(10)
 			state = 0
 			
 
